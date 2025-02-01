@@ -1,0 +1,151 @@
+```{r}
+# Load Maaslin2 library
+library(Maaslin2)
+library(dplyr)
+source("scripts/bresat.R")
+source("scripts/functions.R")
+
+base_output_dir <- "data/maaslin_output/crc"
+data_path <- 'data/with_disease_data'
+```
+
+```{r}
+# Use read.csv to load a CSV file
+pathways <- t(read.csv(paste(data_path, "/filtered_paths_with_disease_samples_pathway_counts.csv", sep = ""), header = TRUE, row.names = 1, sep = ","))
+metadata <- read.csv(paste(data_path,"/filtered_paths_with_disease_samples_metadata.csv", sep = ""), row.names = 1)
+selected_rows <- rownames(metadata)
+pathways <- pathways[selected_rows, , drop = FALSE]
+
+# dominant_type
+metadata$dominant_type <- apply(metadata, 1, get_dominant_type)
+# Ensure the 'disease' column is a factor
+metadata$disease <- factor(metadata$disease, levels = c("healthy", "CRC"))
+# Verify that "healthy" is set as the reference level
+levels(metadata$disease)
+```
+
+```{r}
+##### standard analysis with no AA info all samples from crc study #####
+fixed_effects <- c("disease")
+random_effects <- c("subject_id", "study")
+base_dir <- paste0(base_output_dir,"/standard_analysis_noAA_crc/")
+crc_study_filter <- metadata[metadata$disease == 'CRC', "study"]
+crc_study_filter <- as.list(crc_study_filter)
+
+all_crc <- metadata %>% 
+  filter(study %in% crc_study_filter)
+
+selected_rows <- rownames(all_crc)
+crc_counts <- pathways[selected_rows, , drop = FALSE]
+print(dim(all_crc))
+print(dim(crc_counts))
+
+# Run Maaslin2
+fit <- Maaslin2(
+  input_data = crc_counts,  # Your input pathway data
+  input_metadata = all_crc,  # Your input metadata
+  output = base_dir,  # Output directory for the results
+  fixed_effects = fixed_effects,  # Your defined fixed effects
+  random_effects = random_effects,  # Your defined random effects
+  normalization = 'CSS',  # Current normalization option
+  transform = 'NONE',  # Current transform option
+  analysis_method = 'NEGBIN',  # Current analysis method
+  correction = "BH",  # Adjust for multiple testing (Benjamini-Hochberg)
+  standardize = FALSE,  # Set standardization off (optional)
+  plot_heatmap = TRUE, # Whether to plot a heatmap of results
+  cores = 8,
+  reference = c("disease,healthy"), 
+)
+```
+
+```{r}
+##### standard analysis with AA info all samples from crc study  #####
+fixed_effects <- c('type1', 'type2', 'type3', "disease")
+random_effects <- c("subject_id", "study")
+base_dir <- paste0(base_output_dir,"/analysis_withAA_crc/")
+crc_study_filter <- metadata[metadata$disease == 'CRC', "study"]
+crc_study_filter <- as.list(crc_study_filter)
+
+all_crc <- metadata %>% 
+  filter(study %in% crc_study_filter)
+
+selected_rows <- rownames(all_crc)
+crc_counts <- pathways[selected_rows, , drop = FALSE]
+print(dim(all_crc))
+print(dim(crc_counts))
+
+# Run Maaslin2
+fit <- Maaslin2(
+  input_data = crc_counts,  # Your input pathway data
+  input_metadata = all_crc,  # Your input metadata
+  output = base_dir,  # Output directory for the results
+  fixed_effects = fixed_effects,  # Your defined fixed effects
+  random_effects = random_effects,  # Your defined random effects
+  normalization = 'CSS',  # Current normalization option
+  transform = 'NONE',  # Current transform option
+  analysis_method = 'NEGBIN',  # Current analysis method
+  correction = "BH",  # Adjust for multiple testing (Benjamini-Hochberg)
+  standardize = FALSE,  # Set standardization off (optional)
+  plot_heatmap = TRUE, # Whether to plot a heatmap of results
+  cores = 8,
+  reference = c("disease,healthy"), 
+)
+```
+
+
+```{r}
+# Read the significant result files into R
+noAA_crc <- read.table("data/maaslin_output/crc/standard_analysis_noAA_crc/significant_results.tsv", header = TRUE, sep = "\t")
+withAAnumbers_allcrc <- read.table("data/maaslin_output/crc/analysis_withAA_crc/significant_results.tsv", header = TRUE, sep = "\t")
+
+get_disease <- function(maaslin_df, condition, qval_threshold) {
+  # Filter based on the 'metadata' condition and 'qval' threshold
+  filtered_df <- maaslin_df %>%
+    filter(metadata == condition, qval <= qval_threshold)
+  return(filtered_df)
+}
+# Set the q-value threshold
+qval_threshold <- 0.05
+# Apply the function to filter each data frame
+noAA_crc_dis <- get_disease(noAA_crc, 'disease', qval_threshold)
+withAAnumbers_allcrc_dis <- get_disease(withAAnumbers_allcrc, 'disease', qval_threshold)
+
+```
+
+```{r}
+library(VennDiagram)
+
+# Define the output directory
+output_dir <- "figures/exp05/3_figures/"
+
+# Ensure the directory exists
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+}
+
+# Define the PDF file path
+output_file <- paste0(output_dir, "figure6C_venndiagram_crc_aa_vs_noaa.pdf")
+
+# Extract row names
+noAA_rows <- noAA_crc_dis$feature
+withAA_rows <- withAAnumbers_allcrc_dis$feature
+
+# Create the Venn diagram
+venn.plot <- draw.pairwise.venn(
+  area1 = length(noAA_rows),
+  area2 = length(withAA_rows),
+  cross.area = length(intersect(noAA_rows, withAA_rows)),
+  category = c("NoAA crc", "WithAA crc"),
+  fill = c("blue", "red"),
+  alpha = c(0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5,
+  cat.pos = c(-20, 20),
+  cat.dist = 0.05
+)
+
+# Save the Venn diagram as a PDF
+pdf(output_file, width = 8, height = 6)
+grid.draw(venn.plot)  # Draw the Venn diagram
+dev.off()
+```

@@ -1,0 +1,110 @@
+
+```{r}
+source("scripts/bresat.R")
+path_main <- 'data/scAAnet_output'
+pathways <- t(read.csv(paste(path_main, "/top20paths_counts_allsample_heatmap.csv", sep = ""), sep = ",", header = TRUE, row.names = 1))
+metadata = read.csv(paste(path_main, "/healthy_metadata_with_usage.csv", sep = ""), sep = ",", row.names = 1)
+# Assuming your metadata data frame is called metadata
+colnames(metadata)[colnames(metadata) == "type.1.value"] <- "type1"
+colnames(metadata)[colnames(metadata) == "type.2.value"] <- "type2"
+colnames(metadata)[colnames(metadata) == "type.3.value"] <- "type3"
+colnames(metadata)[colnames(metadata) == "Dominant.type"] <- "Dominant_type"
+
+pathways <- as.data.frame(pathways)  # Ensure it's a data frame
+metadata <- as.data.frame(metadata)  # Ensure it's a data frame
+
+# reorder rownames in metadata so it matches colnames of pathways
+metadata <- metadata[match(colnames(pathways), rownames(metadata)),]
+table(rownames(metadata)==colnames(pathways))
+
+alldf <- c(list(pathways), list(metadata))
+names(alldf) <- c("top 20 pathways per type", "metadata")
+```
+
+```{r}
+alldf.counts <- alldf[c(1)]
+
+bresat<-NULL
+bresat <- lapply(alldf.counts, function(df) {
+    sig.ranksum(as.matrix(df), ns=1:nrow(df), full.return=TRUE)
+  })
+
+roi<-NULL
+roi<- mclapply(bresat, function(bs) {
+    random.ranks(bs, n=10000, mc.cores = 80)
+  }, mc.cores=80)
+
+
+for (nms in names(bresat)){
+    bresat[[nms]]$roi<-roi[[nms]]
+}
+
+### define roi categories
+roi.cat <- NULL
+roi.cat<- mclapply(bresat, function(bs) {
+    define.roi.regions(bs, bs$roi)
+  }, mc.cores=80)
+
+
+for (nms in names(bresat)){
+    bresat[[nms]]$roi.cat<-roi.cat[[nms]]
+}
+```
+
+```{r}
+alldf.metadata <- alldf[c(2)]
+
+type_colors <- setNames(c('#66CCEE', '#CCBB44', '#AA3377'), c("type1", "type2", "type3"))
+
+type_colors_fixed <- list(
+    type1 = colorRampPalette(c("#E8F7FC", "#66CCEE", "#1A5570"))(100),    # Blue family
+    type2 = colorRampPalette(c("#F7F4E0", "#CCBB44", "#665D22"))(100),    # Red family
+    type3 = colorRampPalette(c("#F2E0EA", "#AA3377", "#551A3B"))(100)   # Purple family
+)
+
+map_to_palette_fixed <- function(x, palette, min_val = 0, max_val = 1) {
+  # Map values to indices based on fixed range
+  idx <- round((x - min_val) / (max_val - min_val) * 99) + 1
+  
+  # Ensure indices are within bounds
+  idx[idx < 1] <- 1
+  idx[idx > 100] <- 100
+  
+  palette[idx]
+}
+
+alldf.metadata <- lapply(alldf.metadata, function(df){
+  df <- df[, c("Dominant_type", "type1", "type2", "type3")]
+  df$Dominant_type <- type_colors[df$Dominant_type]
+
+  # Apply color mapping to each type column
+  df$type1 <- map_to_palette_fixed(df$type1, type_colors_fixed$type1)
+  df$type2 <- map_to_palette_fixed(df$type2, type_colors_fixed$type2)
+  df$type3 <- map_to_palette_fixed(df$type3, type_colors_fixed$type3)
+
+  return(df)
+})
+
+names(alldf.metadata) <- names(bresat)[1]
+```
+```{r}
+top20 <- read.csv(paste(path_main, "/top20paths_counts_allsample_heatmap.csv", sep = ""), sep = ",", header = TRUE, row.names = 1)
+top20path <- colnames(top20)[-1]
+countdf <- alldf[c(1)][[1]]
+rownames(bresat$`top 20 pathways per type`$dat)[match(top20path,rownames(bresat$`top 20 pathways per type`$dat))]
+bresat$`top 20 pathways per type`$dat <- bresat$`top 20 pathways per type`$dat[match(top20path,rownames(bresat$`top 20 pathways per type`$dat)),]
+```
+```{r}
+library(gridBase)
+library(gridExtra)
+library(grid)
+
+source("scripts/myheatmap.R")
+pdf("figures/exp03/3_figures/figure2F_top20paths_bresat_heatmap.pdf" )
+for (nms in names(bresat)){
+    plot.new(); grid.newpage()
+    create.bresat.heatmap(bs=bresat[[nms]], cl.df=alldf.metadata[[nms]], cl.var = c("type1", "type2", "type3", 'Dominant_type'), cl.height = 2,
+                           title=nms)
+  }
+dev.off()
+```

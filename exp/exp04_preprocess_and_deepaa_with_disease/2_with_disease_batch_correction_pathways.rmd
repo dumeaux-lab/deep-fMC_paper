@@ -1,0 +1,42 @@
+```{r}
+library(sva)
+library(dplyr)
+path_main <- 'data/with_disease_data'
+dir.create(path_main)
+if (file.exists(path_main)) {
+  print("Directory created successfully.")
+} else {
+  print("Failed to create directory.")
+}
+```
+
+```{r}
+pathways <- read.csv(paste(path_main, "/filtered_paths_with_disease_samples_pathway_counts.csv", sep = ""), header = TRUE, row.names = 1, sep = ",")
+batch<-read.csv(paste(path_main,"/filtered_paths_with_disease_samples_metadata.csv", sep = ""), row.names = 1)
+
+result <- batch %>%
+  group_by(study) %>%
+  summarise(count = n())
+
+result_filtered <- result %>%
+  filter(count >= 30)
+
+batch_filtered <- semi_join(batch, result_filtered, by = "study")
+write.csv(batch_filtered, file = paste(path_main, '/batchfix_paths_with_disease_samples_pathway_metadata.csv', sep = ""))
+
+columns_to_keep <- rownames(batch_filtered)
+# Convert columns_to_keep to character
+columns_to_keep <- as.character(columns_to_keep)
+colnames(pathways) <- as.character(colnames(pathways))
+# Select only the columns that are in 'columns_to_keep'
+pathways_filtered <- pathways %>%
+  select(all_of(columns_to_keep))
+
+batch_filtered<- unlist(c(batch_filtered["study"]))
+
+adjusted<-ComBat_seq(as.matrix(pathways_filtered),batch=batch_filtered,group=NULL)
+
+```
+```{r}
+write.csv(adjusted, file = paste(path_main, '/batchfix_paths_with_disease_samples_pathway_counts.csv', sep = ""))
+```

@@ -1,0 +1,201 @@
+```{r}
+library(scDesign3)
+library(SingleCellExperiment)
+library(ggplot2)
+library(dplyr)
+library(DT)
+theme_set(theme_bw())
+library(readr)
+set.seed(123)
+```
+
+```{r}
+path_main <- 'data/scdesign3_output'
+dir.create(path_main)
+if (file.exists(path_main)) {
+  print("Directory created successfully.")
+} else {
+  print("Failed to create directory.")
+}
+
+```
+
+```{r}
+pathways <- read.csv("data/only_healthy_data/filtered_paths_healthy_samples_metadata.csv", header = TRUE, row.names = 1, sep = ",")
+# Check for missing values in the dataframe
+missing_values <- is.na(pathways)
+# Count the number of missing values in each column
+missing_count <- colSums(missing_values)
+# Count the total number of missing values in the dataframe
+total_missing_count <- sum(missing_count)
+# Print the results
+print("Missing Values in Each Column:")
+print(missing_count)
+print("Total Missing Values in the Dataframe:")
+print(total_missing_count)
+```
+
+```{r}
+AICmodel <- function(counts, method) {
+    counts_df <- as.data.frame(counts)
+    counts_df <- counts_df[rowSums(counts_df != 0) > 0, ]
+
+    # Save count_table as an RDS file
+    saveRDS(counts_df, "data/scdesign3_output/counts_df.rds")
+
+    # Load the data
+    paths <- readRDS("data/scdesign3_output/counts_df.rds")
+
+    # Create a SingleCellExperiment object
+    paths_sce <- SingleCellExperiment(list(counts = paths))
+
+    # Access the rowData slot and create a new column called "sample"
+    rowData(paths_sce) <- data.frame(sample = rownames(paths_sce), row.names = rownames(paths_sce))
+
+    # Create a "path" column in the rowData
+    rowData(paths_sce)$path <- data.frame(sample = rownames(paths_sce), row.names = rownames(paths_sce))
+
+    # Set cell_type as a factor with a single level "stool"
+    colData(paths_sce)$cell_type <- as.factor("stool")
+
+    # Set library as the column sums of counts
+    colData(paths_sce)$library <- colSums(counts(paths_sce))
+    set.seed(123)
+    scdesign3_result <- scdesign3(
+        sce = paths_sce,
+        assay_use = "counts",
+        celltype = "cell_type",
+        pseudotime = NULL,
+        spatial = NULL, 
+        other_covariates = "library",
+        mu_formula = "offset(log(library))",
+        sigma_formula = "1",
+        family_use = method,
+        n_cores = 1,
+        corr_formula = "1",
+        copula = "gaussian",
+        pseudo_obs = FALSE,
+        return_model = TRUE
+        )
+    return(scdesign3_result)
+}
+
+# Call the function to filter columns
+fpathways_nb = AICmodel(pathways, "nb")
+fpathways_zinb = AICmodel(pathways, "zinb")
+fpathways_poisson = AICmodel(pathways, "poisson")
+fpathways_zip = AICmodel(pathways, "zip")
+fpathways_gaussian = AICmodel(pathways, "gaussian")
+
+```
+
+
+```{r}
+AICfile <- function(object_simu, filename) {
+  list_of_names <- names(object_simu$marginal_list)
+  aic_values <- c()
+  for (i in list_of_names) {
+    if (is.list(object_simu$marginal_list[[i]]$fit)){
+      aic <- extractAIC(object_simu$marginal_list[[i]]$fit)[2]
+      aic_values <- c(aic_values, aic)
+    }  
+    else {
+      aic_values <- c(aic_values, NA)
+      }
+  }
+
+  # Create a data frame using list_of_names, aic_values
+  df <- data.frame(microbe = list_of_names, AIC = aic_values)
+  #print(df)
+  write.csv(df, file = paste(filename, ".csv", sep = ""), row.names = FALSE)
+}
+
+AICfile(fpathways_nb, paste(path_main, "/nb_fit", sep = ""))
+AICfile(fpathways_zinb,  paste(path_main, "/zinb_fit", sep = ""))
+AICfile(fpathways_poisson, paste(path_main, "/poisson_fit", sep = ""))
+AICfile(fpathways_zip, paste(path_main, "/zip_fit", sep = ""))
+AICfile(fpathways_gaussian, paste(path_main, "/gaussian_fit", sep = ""))
+```
+```{r}
+#UMAPs for pathways filtered with 1M2M reads or less 
+counts_df <- as.data.frame(pathways)
+
+counts_df <- counts_df[rowSums(counts_df != 0) > 0, ]
+# Save count_table as an RDS file
+saveRDS(counts_df, "counts_df.rds")
+# Load the data
+pathways <- readRDS("counts_df.rds")
+# Create a SingleCellExperiment object
+paths_sce <- SingleCellExperiment(list(counts = pathways))
+# Access the rowData slot and create a new column called "sample"
+rowData(paths_sce) <- data.frame(sample = rownames(paths_sce), row.names = rownames(paths_sce))
+# Create a "path" column in the rowData
+rowData(paths_sce)$path <- data.frame(sample = rownames(paths_sce), row.names = rownames(paths_sce))
+# Set cell_type as a factor with a single level "stool"
+colData(paths_sce)$cell_type <- as.factor("stool")
+# Set library as the column sums of counts
+colData(paths_sce)$library <- colSums(counts(paths_sce))
+
+logcounts(paths_sce) <- log1p(counts(paths_sce))
+
+process_SingleCellExperiment <- function(pathways_object) {
+  sce_object <- SingleCellExperiment(list(counts = pathways_object$new_count), colData = pathways_object$new_covariate)
+  
+  # Calculate log1p-transformed counts
+  logcounts(sce_object) <- log1p(counts(sce_object))
+  
+  # Add a "library" column to colData
+  colData(sce_object)$library <- colSums(counts(sce_object))
+  
+  return(sce_object)
+}
+
+simu_sce_nb <- process_SingleCellExperiment(fpathways_nb)
+simu_sce_zinb <- process_SingleCellExperiment(fpathways_zinb)
+simu_sce_poisson <- process_SingleCellExperiment(fpathways_poisson)
+simu_sce_zip <- process_SingleCellExperiment(fpathways_zip)
+simu_sce_gaussian <- process_SingleCellExperiment(fpathways_gaussian)
+
+saveRDS(simu_sce_nb, file = paste(path_main, "/simu_sce_nb.rds", sep = ""))
+saveRDS(simu_sce_zinb, file = paste(path_main, "/simu_sce_zinb.rds", sep = ""))
+saveRDS(simu_sce_poisson, file = paste(path_main, "/simu_sce_poisson.rds", sep = ""))
+saveRDS(simu_sce_zip, file = paste(path_main, "/simu_sce_zip.rds", sep = ""))
+saveRDS(simu_sce_gaussian, file = paste(path_main, "/simu_sce_gaussian.rds", sep = ""))
+
+compare_figure <- plot_reduceddim(ref_sce = paths_sce, 
+                                  sce_list = list(simu_sce_nb, simu_sce_zinb, simu_sce_poisson, simu_sce_zip, simu_sce_gaussian), 
+                                  name_vec = c("Reference", "simulated NB", "simulated ZINB", "simulated poisson", "simulated ZIP", "simulated gaussian"),
+                                  assay_use = "logcounts", 
+                                  if_plot = TRUE, 
+                                  color_by = "cell_type", 
+                                  n_pc = 50)
+
+
+edited_plot <- compare_figure$p_umap +
+  theme_cowplot() +
+  theme(
+    axis.title = element_text(face = "bold", size = 14),  # Larger axis titles
+    axis.text = element_text(size = 12),  # Larger axis text
+    legend.title = element_text(size = 14, face = "bold"),  # Larger legend title
+    legend.text = element_text(size = 12),  # Larger legend text
+    legend.position = "right",
+    axis.line = element_line(size = 0.8),  # Slightly thicker axis lines
+    panel.grid = element_blank(),
+    axis.ticks.length = unit(0.3, "cm"),  # Longer axis ticks
+    plot.margin = margin(20, 20, 20, 20)  # Increase plot margins for spacing
+  ) +
+  xlab("UMAP 1") +
+  ylab("UMAP 2") +
+  # Specify the color of dots 
+  scale_color_manual(values = c("navyblue")) +
+  # Change the point size to make dots more visible
+  geom_point(size = 1)  # Increased point size
+
+nature_plot_mod <- nature_plot + theme(
+  strip.text.x = element_text(size = 12, face = "bold"),  # Make facet labels larger and bolder
+  strip.background = element_rect(fill = "white"),# Change facet background to white
+  legend.position = "none"# Remove legend if not necessary
+)
+
+ggsave("figures/exp02/1_figures/S4C_umap_comparing_simulated_dists.pdf", nature_plot_mod, width = 30, height = 6)
+```

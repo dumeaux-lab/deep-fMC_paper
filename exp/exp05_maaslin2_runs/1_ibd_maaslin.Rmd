@@ -1,0 +1,290 @@
+```{r}
+# Load Maaslin2 library
+library(Maaslin2)
+library(dplyr)
+
+source("scripts/bresat.R")
+source("scripts/functions.R")
+
+base_output_dir <- "data/maaslin_output/ibd"
+data_path <- 'data/with_disease_data'
+```
+
+```{r}
+# Use read.csv to load a CSV file
+pathways <- t(read.csv(paste(data_path, "/filtered_paths_with_disease_samples_pathway_counts.csv", sep = ""), header = TRUE, row.names = 1, sep = ","))
+metadata <- read.csv(paste(data_path,"/with_disease_meta_and_usage.csv", sep = ""), row.names = 1)
+selected_rows <- rownames(metadata)
+pathways <- pathways[selected_rows, , drop = FALSE]
+
+# dominant_type
+metadata$dominant_type <- apply(metadata, 1, get_dominant_type)
+# Ensure the 'disease' column is a factor
+metadata$disease <- factor(metadata$disease, levels = c("healthy", "IBD"))
+# Verify that "healthy" is set as the reference level
+levels(metadata$disease)
+```
+
+```{r}
+##### standard analysis with no AA info all samples from IBD study #####
+fixed_effects <- c("disease")
+random_effects <- c("subject_id", "study") 
+base_dir <- paste0(base_output_dir,"/standard_analysis_noAA_ibd/")
+IBD_filter <- unique(metadata[metadata$disease == 'IBD', "study"])
+all_ibd = metadata %>%
+  filter(study %in% IBD_filter)
+
+selected_rows <- rownames(all_ibd)
+ibd_counts <- pathways[selected_rows, , drop = FALSE]
+print(dim(all_ibd))
+print(dim(ibd_counts))
+
+# Run Maaslin2
+fit <- Maaslin2(
+  input_data = ibd_counts,  # Your input pathway data
+  input_metadata = all_ibd,  # Your input metadata
+  output = base_dir,  # Output directory for the results
+  fixed_effects = fixed_effects,  # Your defined fixed effects
+  random_effects = random_effects,  # Your defined random effects
+  normalization = 'CSS',  # Current normalization option
+  transform = 'NONE',  # Current transform option
+  analysis_method = 'NEGBIN',  # Current analysis method
+  correction = "BH",  # Adjust for multiple testing (Benjamini-Hochberg)
+  standardize = FALSE,  # Set standardization off (optional)
+  plot_heatmap = TRUE, # Whether to plot a heatmap of results
+  cores = 8,
+  reference = c("disease,healthy"), 
+)
+```
+
+```{r}
+##### standard analysis with AA info all samples from IBD study  #####
+fixed_effects <- c('type1', 'type2', 'type3', "disease")
+random_effects <- c("subject_id", "study")
+base_dir <- paste0(base_output_dir,"/analysis_withAA_ibd/")
+IBD_filter <- unique(metadata[metadata$disease == 'IBD', "study"])
+all_ibd = metadata %>%
+  filter(study %in% IBD_filter)
+selected_rows <- rownames(all_ibd)
+ibd_counts <- pathways[selected_rows, , drop = FALSE]
+print(dim(all_ibd))
+print(dim(ibd_counts))
+# Run Maaslin2
+fit <- Maaslin2(
+  input_data = ibd_counts,  # Your input pathway data
+  input_metadata = all_ibd,  # Your input metadata
+  output = base_dir,  # Output directory for the results
+  fixed_effects = fixed_effects,  # Your defined fixed effects
+  random_effects = random_effects,  # Your defined random effects
+  normalization = 'CSS',  # Current normalization option
+  transform = 'NONE',  # Current transform option
+  analysis_method = 'NEGBIN',  # Current analysis method
+  correction = "BH",  # Adjust for multiple testing (Benjamini-Hochberg)
+  standardize = FALSE,  # Set standardization off (optional)
+  plot_heatmap = TRUE, # Whether to plot a heatmap of results
+  cores = 8,
+  reference = c("disease,healthy"), 
+)
+```
+
+```{r}
+##### AA info stratified based on dominant type - samples from IBD study #####
+fixed_effects <- c('type1', 'type2', 'type3', "disease")
+random_effects <- c("subject_id", "study")
+all_ibd <- metadata %>% filter(study %in% IBD_filter)
+
+# Define the dominant types
+dominant_types <- c("type1", "type2", "type3")
+
+# Loop through each dominant type in the 'dominant_type' column
+for (dominant_type in dominant_types) {
+  # Filter metadata for the current dominant type
+  dominant_type_ibd <- all_ibd %>% filter(dominant_type == !!dominant_type)
+  # Select rows corresponding to the filtered metadata
+  selected_rows <- rownames(dominant_type_ibd)
+  ibd_counts <- pathways[selected_rows, , drop = FALSE]
+  output_dir <- paste0(base_output_dir, "/ibd_", dominant_type, "_samples/")
+  print(paste("Running analysis for dominant type:", dominant_type))
+  print(dim(dominant_type_ibd))
+  # Run Maaslin2
+  fit <- Maaslin2(
+    input_data = ibd_counts,  # Your input pathway data
+    input_metadata = dominant_type_ibd,  # Filtered metadata for the current dominant type
+    output = output_dir,  # Output directory for the results
+    fixed_effects = fixed_effects,  # Your defined fixed effects
+    random_effects = random_effects,  # Your defined random effects
+    normalization = 'CSS',  # Current normalization option
+    transform = 'NONE',  # Current transform option
+    analysis_method = 'NEGBIN',  # Current analysis method
+    correction = "BH",  # Adjust for multiple testing (Benjamini-Hochberg)
+    standardize = FALSE,  # Set standardization off (optional)
+    plot_heatmap = TRUE,  # Whether to plot a heatmap of results
+    cores = 8,
+    reference = c("disease,healthy")
+  )
+}
+```
+
+
+```{r}
+# Read the significant result files into R
+noAA_IBD <- read.table("data/maaslin_output/ibd/standard_analysis_noAA_ibd/significant_results.tsv", header = TRUE, sep = "\t")
+withAAnumbers_allIBD <- read.table("data/maaslin_output/ibd/analysis_withAA_ibd/significant_results.tsv", header = TRUE, sep = "\t")
+type1_dom_samples <- read.table("data/maaslin_output/ibd/ibd_type1_samples/significant_results.tsv", header = TRUE, sep = "\t")
+type2_dom_samples <- read.table("data/maaslin_output/ibd/ibd_type2_samples/significant_results.tsv", header = TRUE, sep = "\t")
+type3_dom_samples <- read.table("data/maaslin_output/ibd/ibd_type3_samples/significant_results.tsv", header = TRUE, sep = "\t")
+```
+
+```{r}
+##### data setup #####
+get_disease <- function(maaslin_df, condition, qval_threshold) {
+  # Filter based on the 'metadata' condition and 'qval' threshold
+  filtered_df <- maaslin_df %>%
+    filter(metadata == condition, qval <= qval_threshold)
+  return(filtered_df)
+}
+# Set the q-value threshold
+qval_threshold <- 0.01
+# Apply the function to filter each data frame
+noAA_IBD_dis <- get_disease(noAA_IBD, 'disease', qval_threshold)
+withAAnumbers_allIBD_dis <- get_disease(withAAnumbers_allIBD, 'disease', qval_threshold)
+type1_dom_samples_dis <- get_disease(type1_dom_samples, 'disease', qval_threshold)
+type2_dom_samples_dis <- get_disease(type2_dom_samples, 'disease', qval_threshold)
+type3_dom_samples_dis <- get_disease(type3_dom_samples, 'disease', qval_threshold)
+
+# batch corrected pathways
+bc_pathways <- read.csv(paste0(data_path,"/batchfix_paths_with_disease_samples_pathway_counts.csv"), 
+                     sep = ",", row.names = 1, header = TRUE)
+rownames(bc_pathways) <- gsub("[^[:alnum:]]", ".", rownames(bc_pathways))
+# Transpose the pathways data frame
+bc_pathways <- t(bc_pathways)
+library_sizes <- rowSums(bc_pathways)
+# Normalize each sample by dividing by its library size (Total Sum Scaling, TSS)
+# Use 'sweep' to divide each row by its respective library size
+bc_pathways_norm <- sweep(bc_pathways, 1, library_sizes, FUN = "/")
+# Optional: multiply by 1e6 to convert to counts per million (CPM)
+bc_pathways_norm <- bc_pathways_norm * 1e6
+bc_pathways_norm <- t(bc_pathways_norm)
+
+bc_all_ibd <- metadata %>% filter(study %in% IBD_filter)          
+selected_rows <- rownames(bc_all_ibd)
+bc_ibd_counts <- bc_pathways_norm[, selected_rows, drop = FALSE]
+
+bc_type1_dom_ibd <- metadata %>% filter(study %in% IBD_filter & (dominant_type == 'type1'))
+selected_rows <- rownames(bc_type1_dom_ibd)
+bc_type1_dom_ibd_counts <- bc_pathways_norm[, selected_rows, drop = FALSE]
+
+bc_type2_dom_ibd <- metadata %>% filter(study %in% IBD_filter & (dominant_type == 'type2'))
+selected_rows <- rownames(bc_type2_dom_ibd)
+bc_type2_dom_ibd_counts <- bc_pathways_norm[, selected_rows, drop = FALSE]
+
+bc_type3_dom_ibd <- metadata %>% filter(study %in% IBD_filter & (dominant_type == 'type3'))
+selected_rows <- rownames(bc_type3_dom_ibd)
+bc_type3_dom_ibd_counts <- bc_pathways_norm[, selected_rows, drop = FALSE]
+```
+
+```{r}
+noAA_IBD_paths_norm <- bc_ibd_counts[rownames(bc_ibd_counts) %in% noAA_IBD_dis$feature, ]
+withAAnumbers_allIBD_norm <- bc_ibd_counts[rownames(bc_ibd_counts) %in% withAAnumbers_allIBD_dis$feature, ]
+type1_dom_norm <- bc_type1_dom_ibd_counts[rownames(bc_type1_dom_ibd_counts) %in% type1_dom_samples_dis$feature, ]
+type2_dom_norm <- bc_type2_dom_ibd_counts[rownames(bc_type2_dom_ibd_counts) %in% type2_dom_samples_dis$feature, ]
+type3_dom_norm <- bc_type3_dom_ibd_counts[rownames(bc_type3_dom_ibd_counts) %in% type3_dom_samples_dis$feature, ]
+```
+
+```{r}
+##### export files for heatmap #####
+write.csv(noAA_IBD_dis, paste0(base_output_dir,"/noAA_ibd_maaslin_results_disease_fdr01.csv"), row.names = TRUE)
+write.csv(withAAnumbers_allIBD_dis,  paste0(base_output_dir,"/withAA_ibd_maaslin_results_disease_fdr01.csv"), row.names = TRUE)
+write.csv(type1_dom_samples_dis, paste0(base_output_dir,"/ibd_type1_maaslin_results_disease_fdr01.csv"), row.names = TRUE)
+write.csv(type2_dom_samples_dis, paste0(base_output_dir,"/ibd_type2_maaslin_results_disease_fdr01.csv"), row.names = TRUE)
+write.csv(type3_dom_samples_dis,  paste0(base_output_dir,"/ibd_type3_maaslin_results_disease_fdr01.csv"), row.names = TRUE)
+
+# # Export type1_dom_norm to CSV
+write.csv(type1_dom_norm, paste0(base_output_dir,"/type1_dom_libnorm_counts_01maaslinpaths.csv"), row.names = TRUE)
+write.csv(bc_type1_dom_ibd, paste0(base_output_dir,"/type1_dom_metadata.csv"), row.names = TRUE)
+# Export type2_dom_norm to CSV
+write.csv(type2_dom_norm, paste0(base_output_dir,"/type2_dom_libnorm_counts_01maaslinpaths.csv"), row.names = TRUE)
+write.csv(bc_type2_dom_ibd, paste0(base_output_dir,"/type2_dom_metadata.csv"), row.names = TRUE)
+# Export type3_dom_norm to CSV
+write.csv(type3_dom_norm, paste0(base_output_dir,"/type3_dom_libnorm_counts_01maaslinpaths.csv"), row.names = TRUE)
+write.csv(bc_type3_dom_ibd, paste0(base_output_dir,"/type3_dom_metadata.csv"), row.names = TRUE)
+
+write.csv(noAA_IBD_paths_norm, paste0(base_output_dir,"/noAA_allIBD_libnorm_counts_01maaslinpaths.csv"), row.names = TRUE)
+write.csv(bc_all_ibd, paste0(base_output_dir,"/allIBD_metdata.csv"), row.names = TRUE)
+write.csv(withAAnumbers_allIBD_norm, paste0(base_output_dir,"/withAA_allIBD_libnorm_counts_01maaslinpaths.csv"), row.names = TRUE)
+```
+
+```{r}
+library(VennDiagram)
+
+# Define the output directory
+output_dir <- "figures/exp05/1_figures/"
+
+# Ensure the directory exists
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+}
+
+# Define the PDF file path
+output_file <- paste0(output_dir, "figure6C_venndiagram_ibd_aa_vs_noaa.pdf")
+
+# Extract row names
+noAA_rows <- rownames(noAA_IBD_paths_norm)
+withAA_rows <- rownames(withAAnumbers_allIBD_norm)
+
+# Create the Venn diagram
+venn.plot <- draw.pairwise.venn(
+  area1 = length(noAA_rows),
+  area2 = length(withAA_rows),
+  cross.area = length(intersect(noAA_rows, withAA_rows)),
+  category = c("NoAA IBD", "WithAA IBD"),
+  fill = c("blue", "red"),
+  alpha = c(0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5,
+  cat.pos = c(-20, 20),
+  cat.dist = 0.05
+)
+
+# Save the Venn diagram as a PDF
+pdf(output_file, width = 8, height = 6)
+grid.draw(venn.plot)  # Draw the Venn diagram
+dev.off()
+```
+
+```{r}
+type1_rownames <- rownames(type1_dom_norm)
+type2_rownames <- rownames(type2_dom_norm)
+type3_rownames <- rownames(type3_dom_norm)
+
+# Define the sets
+set1 <- type1_rownames
+set2 <- type2_rownames
+set3 <- type3_rownames
+
+# Create the Venn diagram
+venn.plot <- venn.diagram(
+    x = list(Type1 = set1, Type2 = set2, Type3 = set3),
+    filename = NULL,
+    fill = c("red", "green", "blue"),
+    alpha = 0.5,
+    cex = 2,
+    cat.cex = 2,
+    cat.col = c("red", "green", "blue"),
+    category.names = c("", "", ""),  # Remove default labels
+    print.mode = c("raw")  # Display counts and percentages
+)
+
+# Save to PDF
+pdf(paste0(output_dir, "figure6E_venndiagram_ibd_types.pdf"), width = 8, height = 8)  # Adjust width and height as needed
+grid.newpage()
+grid.draw(venn.plot)
+
+# Add custom labels
+grid.text("Type1", x = 0.1, y = 0.05, gp = gpar(col = "red", cex = 1.5))
+grid.text("Type2", x = 0.9, y = 0.05, gp = gpar(col = "green", cex = 1.5))
+grid.text("Type3", x = 0.5, y = 0.97, gp = gpar(col = "blue", cex = 1.5))
+
+dev.off()  # Close the PDF device
+```
+

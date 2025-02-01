@@ -1,0 +1,72 @@
+```{r}
+data_path <- 'data/with_disease_data'
+# Use read.csv to load a CSV file
+pathways <- t(read.csv(paste(data_path, "/filtered_paths_with_disease_samples_pathway_counts.csv", sep = ""), header = TRUE, row.names = 1, sep = ","))
+metadata <- read.csv(paste(data_path,"/with_disease_meta_and_usage.csv", sep = ""), row.names = 1)
+selected_rows <- rownames(metadata)
+pathways <- pathways[selected_rows, , drop = FALSE]
+
+# dominant_type
+metadata$dominant_type <- apply(metadata, 1, get_dominant_type)
+```
+
+```{r}
+IBD_filter <- unique(metadata[metadata$disease == "IBD", "study"])
+T2D_filter <- unique(metadata[metadata$disease == "T2D", "study"])
+CRC_filter <- unique(metadata[metadata$disease == "CRC", "study"])
+# Define filters and colors for diseases
+disease_filters <- list(
+  "IBD" = list(filter = IBD_filter, color = "red"),
+  "T2D" = list(filter = T2D_filter, color = "lightgreen"),
+  "CRC" = list(filter = CRC_filter, color = "orange")
+)
+
+# Directory to save the plots
+output_dir <- "figures/exp04/4_figures"
+
+# Loop over the filters
+for (disease_name in names(disease_filters)) {
+  # Extract the filter and color for the current disease
+  disease_filter <- disease_filters[[disease_name]]$filter
+  disease_color <- disease_filters[[disease_name]]$color
+  
+  # Filter metadata for the current disease
+  all_disease <- metadata %>%
+    filter(study %in% disease_filter)
+  print(dim(all_disease))
+  # Select rows for the pathways
+  selected_rows <- rownames(all_disease)
+  disease_counts <- pathways[selected_rows, , drop = FALSE]
+  # Reshape data for plotting
+  all_disease_long <- melt(all_disease, id.vars = "disease", 
+                           measure.vars = c("type1", "type2", "type3"),
+                           variable.name = "Type", value.name = "Value")
+  
+  # Custom color for the current disease
+  disease_colors <- c(
+    "healthy" = "skyblue",
+    "IBD" = "red",
+    "T2D" = "lightgreen",
+    "CRC" = "orange"
+  )
+  # Create the violin plot
+  plot <- ggplot(all_disease_long, aes(x = disease, y = Value, fill = disease)) +
+    geom_violin(trim = FALSE, alpha = 0.6) +                          # Violin plot
+    geom_boxplot(width = 0.1, position = position_dodge(0.9), 
+                 outlier.shape = NA, alpha = 0.5, color = "black") +  # Boxplot inside violin
+    facet_wrap(~Type, scales = "free_y") +                           # Facet by type1, type2, type3
+    scale_fill_manual(values = disease_colors) +                     # Custom colors
+    theme_minimal() +
+    labs(
+         x = "Disease Status",
+         y = "Value") +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          legend.title = element_blank(),
+          strip.text = element_text(size = 12)) +
+    coord_cartesian(ylim = c(0, 1))
+  # Save the plot
+  output_file <- sprintf("%s/figure6B_%s_usage_violin.pdf", output_dir, tolower(disease_name))
+  ggsave(output_file, plot, width = 12, height = 6)
+}
+```
