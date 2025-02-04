@@ -18,6 +18,18 @@ Data files for input and output from exp files can be found at https://osf.io/tv
 ### 4. `scripts`
 - **Purpose**: Contains utility scripts or modules that provide functions used across experiments.
 
+## Creating conda enviroment to run the notebooks under `exp`
+Run the following bash code in the terminal window to install the packages required to run the Jupyter notebooks under `exp` in a [conda](https://www.anaconda.com/download/success) enviroment called deep-fMC_paper
+```bash
+conda create -n deep-fMC_paper python=3.10.11 "numpy<2" -y && \
+conda activate deep-fMC_paper && \
+pip install tensorflow==2.10.0 fastcluster && \
+conda install -c conda-forge cudatoolkit=11.8 cudnn=8.8.0.121 -y && \
+conda install -c conda-forge "numpy<2" pandas scanpy matplotlib scikit-learn -y && \
+conda install -n deep-fMC_paper ipykernel --update-deps --force-reinstall -y && \
+conda install -c conda-forge geopandas -y
+```
+
 ## Running the trained model to call functional archetypes in your own dataset
 
 ### Environment set-up
@@ -30,7 +42,7 @@ The trained model was developed in a conda environment with the following specif
 
 We recommend cloning the scAAnet repository rather than installing it via pip to ensure compatibility with its dependencies.
 
-To create the conda environment and install the necessary dependencies, use the following command:
+To create the conda environment and install the necessary dependencies, use the following command (skip this step if you already created the enviroment described above):
 
 ```bash
 conda create -n scAAnet python=3.10.11 -y && conda activate scAAnet && pip install tensorflow==2.10.0 && conda install -c conda-forge cudatoolkit=11.8 cudnn=8.8.0.121 -y
@@ -45,7 +57,7 @@ git clone https://github.com/AprilYuge/scAAnet.git
 ### Preparing Your Data
 To assign archetypes using the model trained on healthy gut microbiome samples, you must have pathway relative abundances generated with HUMAnN3 and formatted as an [AnnData object](https://anndata.readthedocs.io/en/latest/tutorials/notebooks/getting-started.html)
 
-Ensure that the features_model_trained_on.csv file (which contains the pathways used in training) matches the pathways in your input data.
+Ensure that the data/trained_model/features_model_trained_on.csv file (which contains the pathways used in training, available at https://osf.io/tvu52/) matches the pathways in your input data.
 
 
 ### Load and use the trained model
@@ -86,7 +98,7 @@ TPM_samples = count_samples / count_samples.sum(axis=1)
 # Calculate the library size (sum of all counts per sample)
 lib_size_samples = count_samples.sum(axis=1)
 
-model_path = "../../data/scAAnet_output"
+model_path = "../../data/trained_model"
 # Load the trained model to get reconstruction of count matrix
 model = load_model(
     f"{model_path}/model.h5",
