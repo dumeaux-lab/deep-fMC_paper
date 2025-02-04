@@ -18,32 +18,47 @@ Data files for input and output from exp files can be found at https://osf.io/tv
 ### 4. `scripts`
 - **Purpose**: Contains utility scripts or modules that provide functions used across experiments.
 
-## Installation guide
+## Running the trained model to call functional archetypes in your own dataset
 
-The model we used can be found in https://github.com/AprilYuge/scAAnet/blob/main/
+### Environment set-up
+We performed deep archetypal analysis using the [scAAnet](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1010025) framework: https://github.com/AprilYuge/scAAnet/blob/main/
 
-The conda enviroment used to train the model had python 3.10.11, tensorflow 2.10.0 and cuda-version 11.8. We recommend cloning the repo instead of trying to install scAAnet using pip
+The trained model was developed in a conda environment with the following specifications:
+- Python 3.10.11
+- TensorFlow 2.10.0
+- CUDA 11.8
+
+We recommend cloning the scAAnet repository rather than installing it via pip to ensure compatibility with its dependencies.
+
+To create the conda environment and install the necessary dependencies, use the following command:
 
 ```bash
 conda create -n scAAnet python=3.10.11 -y && conda activate scAAnet && pip install tensorflow==2.10.0 && conda install -c conda-forge cudatoolkit=11.8 cudnn=8.8.0.121 -y
 ```
 
-### If using local machine to clone scAAnet repo
+If using local machine to clone scAAnet repo
 
 ```bash
 git clone https://github.com/AprilYuge/scAAnet.git 
 ```
 
-### If using ssh to clone scAAnet repo
-```bash
-git clone git@github.com:AprilYuge/scAAnet.git 
-```
+### Preparing Your Data
+To assign archetypes using the model trained on healthy gut microbiome samples, you must have pathway relative abundances generated with HUMAnN3 and formatted as an [AnnData object](https://anndata.readthedocs.io/en/latest/tutorials/notebooks/getting-started.html)
 
-## Running the trained model to call functional archetypes in your own dataset
+Ensure that the features_model_trained_on.csv file (which contains the pathways used in training) matches the pathways in your input data.
 
-You will need to have pathway relative abundance obtained from HUMAnN3 and formatted as a [AnnData object](https://anndata.readthedocs.io/en/latest/tutorials/notebooks/getting-started.html)
 
+### Load and use the trained model
 Below is a sample code snippet (from `exp/exp04_exp04_preprocess_and_deepaa_with_disease/3_deepaa_model_disease_analysis.ipynb`) showing how to load and use the trained model. Make sure to replace any paths and variable names with your actual locations and data.
+
+We modified specific functions from the original scAAnet implementation in order to enable the saving and loading of the trained model as an .h5 file. These modifications were made to the network.py file from the scAAnet repository.
+The modified functions are imported as follows:
+```python
+from modified_network import ZFixedLayer, DispLayer, DispAct, create_z_fixed, ColwiseMultLayer
+```
+The file modified_network.py is an adapted version of the network.py file from the original scAAnet repository. These changes allow the trained model, encoder, and decoder to be saved and later reloaded for downstream analyses, which is not supported in the original scAAnet implementation.
+
+If you wish to reproduce this workflow, ensure that the modified_network.py file is placed in the appropriate directory (e.g., ../../scripts) and that it is correctly referenced in your code.
 
 ```python
 import numpy as np
@@ -109,3 +124,11 @@ decoder = load_model(
 # Retrieve the latent representation from the model
 z_fixed_weights = model.get_layer("z_fixed").get_weights()[0]
 spectra = decoder.predict(z_fixed_weights)
+```
+
+### Output details
+
+- recon: The reconstructed count matrix based on the input data.
+- usage: Archetype usage, which quantifies how much each archetype contributes to each sample.
+- spectra: The latent representation or spectra of the archetypes, representing their key features.
+
