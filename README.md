@@ -29,6 +29,13 @@ conda install -c conda-forge "numpy<2" pandas scanpy matplotlib scikit-learn -y 
 conda install -n deep-fMC_paper ipykernel --update-deps --force-reinstall -y && \
 conda install -c conda-forge geopandas -y
 ```
+We recommend cloning the scAAnet repository rather than installing it via pip to ensure compatibility with its dependencies.
+
+If using local machine to clone scAAnet repo
+
+```bash
+git clone https://github.com/AprilYuge/scAAnet.git 
+```
 
 ## Running the trained model to call functional archetypes in your own dataset
 
@@ -40,18 +47,10 @@ The trained model was developed in a conda environment with the following specif
 - TensorFlow 2.10.0
 - CUDA 11.8
 
-We recommend cloning the scAAnet repository rather than installing it via pip to ensure compatibility with its dependencies.
-
-To create the conda environment and install the necessary dependencies, use the following command (skip this step if you already created the enviroment described above):
+To create the conda environment and install the necessary dependencies, use the following command (skip this step and use deep-fMC_paper enviroment if already created as described above):
 
 ```bash
-conda create -n scAAnet python=3.10.11 -y && conda activate scAAnet && pip install tensorflow==2.10.0 && conda install -c conda-forge cudatoolkit=11.8 cudnn=8.8.0.121 -y
-```
-
-If using local machine to clone scAAnet repo
-
-```bash
-git clone https://github.com/AprilYuge/scAAnet.git 
+conda create -n deepAAmodel python=3.10.11 -y && conda activate scAAnet && pip install tensorflow==2.10.0 && conda install -c conda-forge cudatoolkit=11.8 cudnn=8.8.0.121 -y
 ```
 
 ### Preparing Your Data
