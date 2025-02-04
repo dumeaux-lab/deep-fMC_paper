@@ -37,6 +37,26 @@ If using local machine to clone scAAnet repo
 git clone https://github.com/AprilYuge/scAAnet.git 
 ```
 
+### R packages used to run `.rmd` notebooks under `exp`
+scDesign3 (1.2.0), 
+SingleCellExperiment (1.26.0), 
+ggplot2 (3.5.1), 
+dplyr (1.1.4), 
+DT (0.33), 
+readr (2.1.5), 
+sva (3.52.0)
+
+```r
+# to install the R packages needed
+install.packages(c("ggplot2", "dplyr", "DT", "readr"))
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install(c("SingleCellExperiment", "sva"))
+if (!require("devtools", quietly = TRUE))
+    install.packages("devtools")
+devtools::install_github("SONGDONGYUAN1994/scDesign3")
+```
+
 ## Running the trained model to call functional archetypes in your own dataset
 
 ### Environment set-up
