@@ -3,6 +3,7 @@
 This repository contains code and analyses for characterizing functional microbial communities (fMC) using deep archetypal analysis, as described in our paper (https://doi.org/10.1101/2025.01.29.635381).
 
 If you use this code or model in your research, please cite:
+
 Meawad M, Singh D, Deng A, Sonthalia R, Cai E, Dumeaux V. Functional archetypes in the human gut microbiome reveal metabolic diversity, stability, and influence disease-associated signatures. bioRxiv 2025. doi: 10.1101/2025.01.29.635381
 
 Input and output data files can be found at https://osf.io/tvu52/
