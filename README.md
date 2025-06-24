@@ -78,7 +78,7 @@ To create the conda environment and install the necessary dependencies, use the 
 conda create -n deepAAmodel python=3.10.11 -y && conda activate deepAAmodel && pip install tensorflow==2.10.0 && conda install -c conda-forge cudatoolkit=11.8 cudnn=8.8.0.121 -y
 ```
 
-### Preparing Your Data
+### Preparing your data
 To assign archetypes using the model trained on healthy gut microbiome samples, you must have pathway relative abundances generated with HUMAnN3 and formatted as an [AnnData object](https://anndata.readthedocs.io/en/latest/tutorials/notebooks/getting-started.html). The AnnData object should contain pathway abundances in the `.X` attribute.
 
 We recommend following the same preprocessing and batch correction steps described in the manuscript. Code for data preprocessing is provided here: https://github.com/dumeaux-lab/compendium-fMC. However, assignments of archetypal scores are robust to alternative approaches (using MetaPhlAn instead of Kraken2/Bracken or using default Kraken2 database instead of HumGut).
