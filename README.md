@@ -149,7 +149,7 @@ encoder = load_model(
         "create_z_fixed": create_z_fixed
     }
 )
-usage = encoder.predict({"nor_count": TPM_samples, "lib_size": TPM_samples})
+usage = encoder.predict({"nor_count": TPM_samples, "lib_size": lib_size_samples})
 
 # Load and run the decoder to get the spectra of the archetypes 
 decoder = load_model(
