@@ -4,7 +4,7 @@ This repository contains code and analyses for characterizing functional microbi
 
 If you use this code or model in your research, please cite:
 
-Meawad M, Singh D, Deng A, Sonthalia R, Cai E, Dumeaux V. Functional archetypes in the human gut microbiome reveal metabolic diversity, stability, and influence disease-associated signatures. bioRxiv 2025. doi: 10.1101/2025.01.29.635381
+Meawad, M., Singh, D., Deng, A. et al. Functional archetypes in the human gut microbiome reveal metabolic diversity, stability, and influence disease-associated signatures. Microbiome 13, 241 (2025). https://doi.org/10.1186/s40168-025-02240-5
 
 Input and output data files can be found at https://osf.io/tvu52/
 
@@ -171,6 +171,9 @@ spectra = decoder.predict(z_fixed_weights)
 - recon: Reconstructed count matrix based on the input data (samples x pathways)
 - usage: Archetype usage scores per sample (matrix of samples x 3 archetypes, values sum to 1)
 - spectra: Archetypal patterns representing key features of each archetype (archetypes x pathways)
+
+### Citation
+Meawad, M., Singh, D., Deng, A. et al. Functional archetypes in the human gut microbiome reveal metabolic diversity, stability, and influence disease-associated signatures. Microbiome 13, 241 (2025). https://doi.org/10.1186/s40168-025-02240-5
 
 
 
